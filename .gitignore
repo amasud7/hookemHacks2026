@@ -8,3 +8,4 @@ downloads/
 *.egg-info/
 dist/
 build/
+venv/
