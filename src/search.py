@@ -77,7 +77,8 @@ def reciprocal_rank_fusion(
 
 
 def search(
-    query: str,
+    query: str = "",
+    query_vector: list[float] | None = None,
     preset: str = "default",
     weights: dict[str, float] | None = None,
     limit: int = 10,
@@ -86,7 +87,8 @@ def search(
     """Search content across all modalities using per-modality vector search + RRF.
 
     Args:
-        query: Natural language search query
+        query: Natural language search query (used if query_vector not provided)
+        query_vector: Pre-computed embedding vector (for multimodal inputs)
         preset: One of QUERY_PRESETS keys ("describe", "reenact", "vibe", "quote", "default")
         weights: Custom weights dict {"text": float, "visual": float, "audio": float}.
                  Overrides preset if provided.
@@ -94,7 +96,10 @@ def search(
         platform: Optional platform filter ("tiktok", "instagram", "youtube")
     """
     w = weights if weights is not None else QUERY_PRESETS.get(preset, QUERY_PRESETS["default"])
-    query_vector = embed_query(query)
+    if query_vector is None:
+        if not query:
+            raise ValueError("Either query or query_vector must be provided")
+        query_vector = embed_query(query)
     num_candidates = limit * 15  # oversample for better recall
 
     filters = {}
