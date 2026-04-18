@@ -5,3 +5,6 @@ __pycache__/
 .sessions/
 content_pool.json
 downloads/
+*.egg-info/
+dist/
+build/
