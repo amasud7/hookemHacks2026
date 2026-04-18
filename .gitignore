@@ -3,7 +3,6 @@ __pycache__/
 *.pyc
 .venv/
 .sessions/
-content_pool.json
 downloads/
 *.egg-info/
 dist/
