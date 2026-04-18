@@ -1,6 +1,7 @@
 // SearchPill — the hero interaction.
 // Floating pill w/ mode chips: Text / Image / Video / Audio
 // Handles typing, recording, image-uploaded, loading states.
+// Supports real file uploads and microphone recording.
 
 const { useState, useEffect, useRef } = React;
 
@@ -44,10 +45,16 @@ function SearchPill({
   setMode,
   uploadedImage,
   setUploadedImage,
+  uploadedFile,
+  setUploadedFile,
   onSubmit,
   recordingTime,
 }) {
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const submitAfterStopRef = useRef(false);
   const isRecording = state === "recording";
   const isLoading = state === "loading";
   const hasImage = !!uploadedImage;
@@ -72,22 +79,82 @@ function SearchPill({
     audio: "hum it, play it, or upload the sound",
   }[mode];
 
+  // --- File upload ---
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadedFile(file);
+    if (file.type.startsWith("image/")) {
+      setUploadedImage(URL.createObjectURL(file));
+      setState("image-uploaded");
+    } else {
+      setUploadedImage(null);
+      setState("image-uploaded");
+    }
+    // Reset the input so the same file can be re-selected
+    e.target.value = "";
+  };
+
+  // --- Audio recording ---
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        const file = new File([blob], "recording.webm", { type: blob.type });
+        setUploadedFile(file);
+        stream.getTracks().forEach((t) => t.stop());
+
+        if (submitAfterStopRef.current) {
+          submitAfterStopRef.current = false;
+          onSubmit({ kind: "audio", file });
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setState("recording");
+    } catch (err) {
+      console.error("Mic access denied:", err);
+      alert("Microphone access is required for audio search.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  // --- Mode selection ---
   const handleMode = (m) => {
     setMode(m);
-    if (m === "audio") setState("recording");
-    else if (m === "image") {
-      setUploadedImage("https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?w=200&q=80");
-      setState("image-uploaded");
+    if (m === "audio") {
+      startRecording();
+    } else if (m === "image" || m === "video") {
+      fileInputRef.current.accept = m === "image" ? "image/*" : "video/*";
+      fileInputRef.current.click();
     } else {
       setState("typing");
     }
   };
 
+  // --- Submit ---
   const handleSubmit = () => {
     if (state === "recording") {
-      onSubmit({ kind: "voice" });
-    } else if (hasImage || query.trim()) {
-      onSubmit({ kind: mode, q: query });
+      submitAfterStopRef.current = true;
+      stopRecording();
+    } else if (uploadedFile) {
+      onSubmit({ kind: mode, file: uploadedFile });
+    } else if (query.trim()) {
+      onSubmit({ kind: "text", q: query });
     }
   };
 
@@ -95,19 +162,53 @@ function SearchPill({
 
   return (
     <div className={`pill pill--${state}`}>
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        style={{ display: "none" }}
+        onChange={handleFileSelect}
+      />
+
       {/* Uploaded image chip row */}
       {hasImage && (
         <div className="pill__attach">
           <div className="attach-chip">
             <img src={uploadedImage} alt="" />
             <div className="attach-chip__meta">
-              <div className="attach-chip__name">reference.jpg</div>
-              <div className="attach-chip__sub">searching visually similar…</div>
+              <div className="attach-chip__name">{uploadedFile ? uploadedFile.name : "reference.jpg"}</div>
+              <div className="attach-chip__sub">searching visually similar\u2026</div>
             </div>
             <button
               className="attach-chip__x"
               onClick={() => {
                 setUploadedImage(null);
+                setUploadedFile(null);
+                setState("empty");
+                setMode("text");
+              }}
+            >
+              <window.Icon.Close width="13" height="13" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Non-image file indicator */}
+      {!hasImage && uploadedFile && state === "image-uploaded" && (
+        <div className="pill__attach">
+          <div className="attach-chip">
+            <div style={{ width: 40, height: 40, borderRadius: 9, background: "var(--bg-3)", display: "grid", placeItems: "center" }}>
+              <window.Icon.Video width="18" height="18" />
+            </div>
+            <div className="attach-chip__meta">
+              <div className="attach-chip__name">{uploadedFile.name}</div>
+              <div className="attach-chip__sub">searching by video content\u2026</div>
+            </div>
+            <button
+              className="attach-chip__x"
+              onClick={() => {
+                setUploadedFile(null);
                 setState("empty");
                 setMode("text");
               }}
@@ -152,21 +253,21 @@ function SearchPill({
             <div className="rec-dot" />
             <div className="rec-time">{fmtTime(recordingTime)}</div>
             <VoiceWave active />
-            <div className="rec-label">listening…</div>
+            <div className="rec-label">listening\u2026</div>
           </div>
         )}
 
-        {/* Submit / Mic button */}
+        {/* Submit / Stop button */}
         <button
           className={`pill__send ${
-            isRecording ? "pill__send--stop" : hasImage || query.trim() ? "pill__send--go" : "pill__send--idle"
+            isRecording ? "pill__send--stop" : hasImage || uploadedFile || query.trim() ? "pill__send--go" : "pill__send--idle"
           }`}
           onClick={handleSubmit}
           disabled={isLoading}
         >
           {isRecording ? (
             <span className="stop-square" />
-          ) : hasImage || query.trim() ? (
+          ) : hasImage || uploadedFile || query.trim() ? (
             <window.Icon.ArrowUp width="18" height="18" />
           ) : (
             <window.Icon.Sparkle width="17" height="17" />

@@ -4,7 +4,7 @@
 
 const { useEffect: useE2, useState: useS2, useRef: useR2 } = React;
 
-function Header({ state, setState, onReset, tweaksOpen, setTweaksOpen, name }) {
+function Header({ state, setState, onReset, name }) {
   const stateList = [
     { id: "empty", label: "landing" },
     { id: "typing", label: "typing" },
@@ -38,108 +38,22 @@ function Header({ state, setState, onReset, tweaksOpen, setTweaksOpen, name }) {
             </button>
           ))}
         </div>
-
       </div>
     </header>
   );
 }
 
-// Tweaks panel — name picker + layout + accent
-function TweaksPanel({ open, onClose, tweaks, setTweaks }) {
-  if (!open) return null;
-  const { name, accent, density, showMatchChip } = tweaks;
-  const names = ["Vibely", "Recall", "Loop", "Grain", "Hum"];
-  const accents = [
-    { k: "terracotta", v: "oklch(0.68 0.16 55)" },
-    { k: "peach", v: "oklch(0.74 0.14 45)" },
-    { k: "clay", v: "oklch(0.6 0.13 40)" },
-    { k: "olive", v: "oklch(0.6 0.09 110)" },
-    { k: "ink", v: "oklch(0.28 0.02 60)" },
-  ];
-  return (
-    <aside className="tweaks">
-      <div className="tweaks__head">
-        <strong>Tweaks</strong>
-        <button onClick={onClose}><window.Icon.Close width="14" height="14" /></button>
-      </div>
-      <div className="tweaks__row">
-        <label>product name</label>
-        <div className="tweaks__chips">
-          {names.map((n) => (
-            <button
-              key={n}
-              className={`tchip ${name === n ? "tchip--on" : ""}`}
-              onClick={() => setTweaks({ ...tweaks, name: n })}
-            >{n}</button>
-          ))}
-        </div>
-      </div>
-      <div className="tweaks__row">
-        <label>accent</label>
-        <div className="tweaks__swatches">
-          {accents.map((a) => (
-            <button
-              key={a.k}
-              className={`swatch ${accent === a.v ? "swatch--on" : ""}`}
-              style={{ background: a.v }}
-              onClick={() => setTweaks({ ...tweaks, accent: a.v })}
-              title={a.k}
-            />
-          ))}
-        </div>
-      </div>
-      <div className="tweaks__row">
-        <label>grid density</label>
-        <div className="tweaks__chips">
-          {["cozy", "default", "dense"].map((d) => (
-            <button
-              key={d}
-              className={`tchip ${density === d ? "tchip--on" : ""}`}
-              onClick={() => setTweaks({ ...tweaks, density: d })}
-            >{d}</button>
-          ))}
-        </div>
-      </div>
-      <div className="tweaks__row">
-        <label>show "why it matched" chip</label>
-        <button
-          className={`toggle ${showMatchChip ? "toggle--on" : ""}`}
-          onClick={() => setTweaks({ ...tweaks, showMatchChip: !showMatchChip })}
-        >
-          <span className="toggle__knob" />
-        </button>
-      </div>
-    </aside>
-  );
-}
-
 function App() {
-  const [state, setState] = useS2("empty"); // empty | typing | recording | image-uploaded | loading | results
+  const [state, setState] = useS2("empty");
   const [mode, setMode] = useS2("text");
   const [query, setQuery] = useS2("");
   const [uploadedImage, setUploadedImage] = useS2(null);
+  const [uploadedFile, setUploadedFile] = useS2(null);
   const [recordingTime, setRecordingTime] = useS2(0);
   const [openResult, setOpenResult] = useS2(null);
-  const [tweaksOpen, setTweaksOpen] = useS2(false);
-  const [tweaks, setTweaks] = useS2(() => {
-    try {
-      return JSON.parse(localStorage.getItem("vibely-tweaks")) || {
-        name: "Vibely",
-        accent: "oklch(0.68 0.16 55)",
-        density: "default",
-        showMatchChip: true,
-      };
-    } catch {
-      return { name: "Vibely", accent: "oklch(0.68 0.16 55)", density: "default", showMatchChip: true };
-    }
-  });
-
-  useE2(() => {
-    localStorage.setItem("vibely-tweaks", JSON.stringify(tweaks));
-    document.documentElement.style.setProperty("--accent", tweaks.accent);
-    document.documentElement.dataset.density = tweaks.density;
-    document.documentElement.dataset.matchchip = tweaks.showMatchChip ? "on" : "off";
-  }, [tweaks]);
+  const [results, setResults] = useS2([]);
+  const [searchError, setSearchError] = useS2(null);
+  const [tweaks] = useS2({ name: "Vibely" });
 
   // Recording timer
   useE2(() => {
@@ -148,16 +62,48 @@ function App() {
     return () => clearInterval(id);
   }, [state]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async (payload) => {
     setState("loading");
-    setTimeout(() => setState("results"), 1400);
+    setSearchError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("mode", payload.kind || "text");
+
+      if (payload.kind === "text" || (!payload.file && query.trim())) {
+        formData.append("query", query);
+        if (!formData.has("mode") || formData.get("mode") !== "text") {
+          formData.set("mode", "text");
+        }
+      }
+      if (payload.file) {
+        formData.append("file", payload.file);
+      }
+
+      const res = await fetch("/api/search", { method: "POST", body: formData });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Search failed: ${res.status}`);
+      }
+      const data = await res.json();
+
+      setResults(data.results || []);
+      setState("results");
+    } catch (err) {
+      console.error("Search error:", err);
+      setSearchError(err.message);
+      setState("empty");
+    }
   };
 
   const handleReset = () => {
     setState("empty");
     setQuery("");
     setUploadedImage(null);
+    setUploadedFile(null);
     setMode("text");
+    setResults([]);
+    setSearchError(null);
   };
 
   const handlePickTrending = (q) => {
@@ -170,17 +116,12 @@ function App() {
     setMode(m);
     if (m === "audio") setState("recording");
     else if (m === "image") {
-      setUploadedImage("https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?w=200&q=80");
       setState("image-uploaded");
     }
   };
 
-  // Keep the 'image-uploaded' preview state coherent when triggered from the state switcher.
+  // Keep preview state coherent when triggered from the state switcher
   useE2(() => {
-    if (state === "image-uploaded" && !uploadedImage) {
-      setUploadedImage("https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?w=200&q=80");
-      setMode("image");
-    }
     if (state === "typing" && !query) setQuery("that chicken on a tree video");
   }, [state]);
 
@@ -191,8 +132,6 @@ function App() {
           state={state}
           setState={setState}
           onReset={handleReset}
-          tweaksOpen={tweaksOpen}
-          setTweaksOpen={setTweaksOpen}
           name={tweaks.name}
         />
       </div>
@@ -212,10 +151,22 @@ function App() {
             setMode={setMode}
             uploadedImage={uploadedImage}
             setUploadedImage={setUploadedImage}
+            uploadedFile={uploadedFile}
+            setUploadedFile={setUploadedFile}
             onSubmit={handleSubmit}
             recordingTime={recordingTime}
           />
         </div>
+
+        {searchError && (
+          <div style={{
+            maxWidth: 780, margin: "16px auto 0", padding: "12px 16px",
+            background: "oklch(0.95 0.05 25)", border: "1px solid oklch(0.85 0.1 25)",
+            borderRadius: 12, fontSize: 13, color: "oklch(0.4 0.15 25)"
+          }}>
+            Search failed: {searchError}
+          </div>
+        )}
 
         {state === "empty" && (
           <window.Landing onPickTrending={handlePickTrending} onPickMode={handlePickMode} />
@@ -244,14 +195,13 @@ function App() {
 
         {state === "results" && (
           <>
-            <ResultsHeader query={query} uploadedImage={uploadedImage} mode={mode} />
-            <window.ResultsGrid results={window.MOCK_RESULTS} onOpen={setOpenResult} />
+            <ResultsHeader query={query} uploadedImage={uploadedImage} mode={mode} count={results.length} />
+            <window.ResultsGrid results={results} onOpen={setOpenResult} />
           </>
         )}
       </main>
 
       <window.ResultDetail result={openResult} onClose={() => setOpenResult(null)} />
-      <TweaksPanel open={tweaksOpen} onClose={() => setTweaksOpen(false)} tweaks={tweaks} setTweaks={setTweaks} />
     </div>
   );
 }
@@ -263,7 +213,7 @@ function highlightMatch(text, q) {
   return text.slice(0, i) + "<mark>" + text.slice(i, i + q.length) + "</mark>" + text.slice(i + q.length);
 }
 
-function ResultsHeader({ query, uploadedImage, mode }) {
+function ResultsHeader({ query, uploadedImage, mode, count }) {
   const label = uploadedImage ? "visually similar to your image" : query || "your search";
   return (
     <div className="results-head">
@@ -274,11 +224,9 @@ function ResultsHeader({ query, uploadedImage, mode }) {
           "{label}"
         </h2>
         <div className="results-head__meta">
-          <span>128 posts</span>
+          <span>{count} post{count !== 1 ? "s" : ""}</span>
           <span className="dotsep" />
           <span>across TikTok, Instagram</span>
-          <span className="dotsep" />
-          <span>indexed in 0.42s</span>
         </div>
       </div>
       <div className="results-head__filters">
@@ -289,8 +237,6 @@ function ResultsHeader({ query, uploadedImage, mode }) {
         <button className="filt">
           <window.Icon.Instagram width="11" height="11" /> instagram
         </button>
-        <button className="filt">short (&lt;15s)</button>
-        <button className="filt">last 7 days</button>
       </div>
     </div>
   );
@@ -299,9 +245,9 @@ function ResultsHeader({ query, uploadedImage, mode }) {
 function LoadingState({ query, uploadedImage }) {
   const steps = [
     "embedding your query",
-    "searching 12.4M indexed posts",
+    "searching indexed posts",
     "ranking by vibe similarity",
-    "preparing previews",
+    "preparing results",
   ];
   const [active, setActive] = useS2(0);
   useE2(() => {
