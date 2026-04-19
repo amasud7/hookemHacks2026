@@ -53,6 +53,8 @@ function App() {
   const [openResult, setOpenResult] = useS2(null);
   const [results, setResults] = useS2([]);
   const [searchError, setSearchError] = useS2(null);
+  const [detectedIntent, setDetectedIntent] = useS2(null);
+  const [lastPayload, setLastPayload] = useS2(null);
   const [tweaks] = useS2({ name: "Vibely" });
 
   // Recording timer
@@ -62,9 +64,10 @@ function App() {
     return () => clearInterval(id);
   }, [state]);
 
-  const handleSubmit = async (payload) => {
+  const handleSubmit = async (payload, overridePreset) => {
     setState("loading");
     setSearchError(null);
+    if (!overridePreset) setLastPayload(payload);
 
     try {
       const formData = new FormData();
@@ -79,6 +82,9 @@ function App() {
       if (payload.file) {
         formData.append("file", payload.file);
       }
+      if (overridePreset) {
+        formData.append("preset", overridePreset);
+      }
 
       const res = await fetch("/api/search", { method: "POST", body: formData });
       if (!res.ok) {
@@ -88,12 +94,20 @@ function App() {
       const data = await res.json();
 
       setResults(data.results || []);
+      setDetectedIntent(data.detected_intent || null);
+      if (data.transcript) setQuery(data.transcript);
       setState("results");
     } catch (err) {
       console.error("Search error:", err);
       setSearchError(err.message);
       setState("empty");
     }
+  };
+
+  const handleOverrideIntent = (newPreset) => {
+    const payload = lastPayload || { kind: "text" };
+    setDetectedIntent(newPreset);
+    handleSubmit(payload, newPreset);
   };
 
   const handleReset = () => {
@@ -196,12 +210,48 @@ function App() {
         {state === "results" && (
           <>
             <ResultsHeader query={query} uploadedImage={uploadedImage} mode={mode} count={results.length} />
+            {detectedIntent && (
+              <IntentBar intent={detectedIntent} onOverride={handleOverrideIntent} />
+            )}
             <window.ResultsGrid results={results} onOpen={setOpenResult} />
           </>
         )}
       </main>
 
       <window.ResultDetail result={openResult} onClose={() => setOpenResult(null)} />
+    </div>
+  );
+}
+
+const INTENT_INFO = {
+  describe: { label: "Describing", desc: "visual-heavy search", icon: "\ud83d\udc41" },
+  reenact:  { label: "Reenacting", desc: "audio-heavy search", icon: "\ud83c\udfb5" },
+  vibe:     { label: "Vibing", desc: "balanced search", icon: "\u2728" },
+  quote:    { label: "Quoting", desc: "text-heavy search", icon: "\ud83d\udcac" },
+};
+
+function IntentBar({ intent, onOverride }) {
+  const presets = ["describe", "reenact", "vibe", "quote"];
+  return (
+    <div className="intent-bar">
+      <span className="intent-bar__label">search mode</span>
+      <div className="intent-bar__chips">
+        {presets.map((p) => {
+          const info = INTENT_INFO[p];
+          const active = intent === p;
+          return (
+            <button
+              key={p}
+              className={`intent-chip ${active ? "intent-chip--active" : ""}`}
+              onClick={() => onOverride(p)}
+            >
+              <span className="intent-chip__icon">{info.icon}</span>
+              <span className="intent-chip__label">{info.label}</span>
+              {active && <span className="intent-chip__desc">{info.desc}</span>}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -12,6 +12,14 @@ function PlatformBadge({ platform }) {
   );
 }
 
+function fmtNum(n) {
+  if (n == null || n === 0) return null;
+  if (typeof n === "string") return n;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return String(n);
+}
+
 function ResultCard({ r, onOpen, i }) {
   const handle = r.handle || (r.creator ? (r.creator.startsWith("@") ? r.creator : `@${r.creator}`) : "");
   const caption = r.caption || "Untitled";
@@ -62,16 +70,16 @@ function ResultCard({ r, onOpen, i }) {
       <div className="card__body">
         {handle && <div className="card__handle">{handle}</div>}
         <div className="card__caption">{caption}</div>
-        {(r.views || r.likes) && (
+        {(fmtNum(r.views) || fmtNum(r.likes)) && (
           <div className="card__stats">
-            {r.views && (
+            {fmtNum(r.views) && (
               <span>
-                <window.Icon.Play width="11" height="11" /> {r.views}
+                <window.Icon.Play width="11" height="11" /> {fmtNum(r.views)}
               </span>
             )}
-            {r.likes && (
+            {fmtNum(r.likes) && (
               <span>
-                <window.Icon.Heart width="11" height="11" /> {r.likes}
+                <window.Icon.Heart width="11" height="11" /> {fmtNum(r.likes)}
               </span>
             )}
           </div>
@@ -132,16 +140,16 @@ function ResultDetail({ result, onClose }) {
           <p className="modal__caption">{result.caption}</p>
           <div className="modal__stats">
             <div>
-              <div className="stat-num">{result.views || "\u2014"}</div>
+              <div className="stat-num">{fmtNum(result.views) || "\u2014"}</div>
               <div className="stat-lbl">views</div>
             </div>
             <div>
-              <div className="stat-num">{result.likes || "\u2014"}</div>
+              <div className="stat-num">{fmtNum(result.likes) || "\u2014"}</div>
               <div className="stat-lbl">likes</div>
             </div>
             <div>
-              <div className="stat-num">{result.duration || "\u2014"}</div>
-              <div className="stat-lbl">length</div>
+              <div className="stat-num">{fmtNum(result.comments) || "\u2014"}</div>
+              <div className="stat-lbl">comments</div>
             </div>
           </div>
           <div className="modal__actions">

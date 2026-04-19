@@ -12,11 +12,21 @@ def ingest_content(
     platform: str,
     url: str,
     video_path: str | Path | None = None,
+    video_bytes: bytes | None = None,
+    video_mime: str = "video/mp4",
+    audio_bytes: bytes | None = None,
+    audio_mime: str = "audio/mpeg",
     caption: str = "",
     creator: str = "",
+    thumb: str = "",
     hashtags: list[str] | None = None,
     duration_seconds: float | None = None,
     content_type: str = "video",
+    likes: int = 0,
+    views: int = 0,
+    comments: int = 0,
+    transcript: str = "",
+    sound_name: str = "",
     created_at: datetime | None = None,
 ) -> ContentDocument:
     """Ingest a single piece of content: embed all available modalities and store in MongoDB.
@@ -38,40 +48,42 @@ def ingest_content(
     audio_emb = None
     has_audio = False
 
-    # 1. Embed visual content (video or image)
-    if video_path is not None:
+    # 1. Embed visual content — from bytes or file path
+    if video_bytes is not None:
+        print(f"  Embedding visual for {content_id}...")
+        visual_emb = embed_video(video_bytes, mime_type=video_mime)
+    elif video_path is not None:
         video_path = Path(video_path)
-        video_bytes = video_path.read_bytes()
-
+        raw_bytes = video_path.read_bytes()
         mime_map = {
-            ".mp4": "video/mp4",
-            ".mov": "video/quicktime",
-            ".webm": "video/webm",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".png": "image/png",
+            ".mp4": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm",
+            ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
         }
         mime_type = mime_map.get(video_path.suffix.lower(), "video/mp4")
-
         print(f"  Embedding visual for {content_id}...")
-        visual_emb = embed_video(video_bytes, mime_type=mime_type)
+        visual_emb = embed_video(raw_bytes, mime_type=mime_type)
 
-        # 2. Extract audio, transcribe, and embed (only for video content)
-        if content_type == "video":
+        # Extract audio from local file if no audio_bytes provided
+        if content_type == "video" and audio_bytes is None:
             print(f"  Extracting audio for {content_id}...")
-            audio_path = extract_audio(video_path)
-            if audio_path is not None:
-                has_audio = True
-                audio_bytes = audio_path.read_bytes()
+            extracted = extract_audio(video_path)
+            if extracted is not None:
+                audio_bytes = extracted.read_bytes()
+                audio_mime = "audio/mpeg"
+                extracted.unlink()
 
-                print(f"  Embedding audio for {content_id}...")
-                audio_emb = embed_audio(audio_bytes)
-                audio_path.unlink()  # clean up temp file
+    # 2. Embed audio — from provided bytes or extracted above
+    if audio_bytes is not None:
+        has_audio = True
+        print(f"  Embedding audio for {content_id}...")
+        audio_emb = embed_audio(audio_bytes, mime_type=audio_mime)
 
-    # 3. Embed text (caption + hashtags)
+    # 3. Embed text (caption + hashtags + transcript)
     text_blob = caption
     if hashtags:
         text_blob += " " + " ".join(f"#{tag}" for tag in hashtags)
+    if transcript:
+        text_blob += " " + transcript
     if text_blob.strip():
         print(f"  Embedding text for {content_id}...")
         text_emb = embed_text(text_blob)
@@ -82,10 +94,16 @@ def ingest_content(
         url=url,
         creator=creator,
         caption=caption,
+        thumb=thumb,
         hashtags=hashtags or [],
         duration_seconds=duration_seconds,
         content_type=content_type,
         has_audio=has_audio,
+        likes=likes,
+        views=views,
+        comments=comments,
+        transcript=transcript,
+        sound_name=sound_name,
         created_at=created_at,
         text_embedding=text_emb,
         visual_embedding=visual_emb,

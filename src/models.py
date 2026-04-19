@@ -10,10 +10,16 @@ class ContentDocument(BaseModel):
     url: str
     creator: str = ""
     caption: str = ""
+    thumb: str = ""  # thumbnail URL
     hashtags: list[str] = Field(default_factory=list)
     duration_seconds: float | None = None
     content_type: str = "video"  # video, slideshow, image
     has_audio: bool = True
+    likes: int = 0
+    views: int = 0
+    comments: int = 0
+    transcript: str = ""
+    sound_name: str = ""
     created_at: datetime | None = None
     ingested_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -40,4 +46,8 @@ class SearchResult(BaseModel):
     url: str
     creator: str = ""
     caption: str = ""
+    thumb: str = ""
+    likes: int = 0
+    views: int = 0
+    comments: int = 0
     score: float = 0.0

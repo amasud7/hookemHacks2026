@@ -438,6 +438,37 @@ mark { background: var(--accent-soft); color: var(--ink); border-radius: 3px; pa
 .results-head__meta { margin-top: 8px; display: flex; gap: 10px; align-items: center; color: var(--ink-3); font-size: 12.5px; }
 .dotsep { width: 3px; height: 3px; border-radius: 50%; background: var(--ink-4); }
 
+/* Intent bar */
+.intent-bar {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 24px;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+.intent-bar__label {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--ink-4); flex-shrink: 0;
+}
+.intent-bar__chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.intent-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+  background: transparent;
+  transition: 0.15s;
+}
+.intent-chip:hover { background: var(--bg-2); color: var(--ink); border-color: var(--line-2); }
+.intent-chip--active {
+  background: var(--ink); color: var(--bg); border-color: var(--ink);
+}
+.intent-chip__icon { font-size: 13px; }
+.intent-chip__desc { font-size: 10.5px; opacity: 0.7; font-style: italic; font-family: var(--font-display); }
+
 .results-head__filters { display: flex; gap: 6px; flex-wrap: wrap; }
 .filt {
   display: inline-flex; align-items: center; gap: 6px;

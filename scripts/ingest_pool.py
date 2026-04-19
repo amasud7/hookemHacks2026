@@ -2,7 +2,7 @@
 
 Maps local video/image files in data/raw/ to their content_pool.json entries,
 then feeds each through the embedding pipeline (visual + audio + text) and
-stores the result in MongoDB Atlas.
+stores the result in MongoDB Atlas with full metadata for frontend display.
 
 Usage:
     python -m scripts.ingest_pool
@@ -29,7 +29,7 @@ FILE_TO_CONTENT = {
     "641ab96e7a424edf82e63756f6c27929": "_speed_trying_not_to_laugh",
     "1f4556cd24de48409484afc4b97b837c": "_ting_ting_tung",
     # TikTok videos
-    "v12025gd0000d62c4g7og65nlsh8jqa0": "_tiktok_unmapped_1",
+    "v12025gd0000d62c7og65nlsh8jqa0": "_tiktok_unmapped_1",
     "v12044gd0000csjes4fog65mbccuiv60": "_tiktok_unmapped_2",
 }
 
@@ -68,6 +68,15 @@ MANUAL_METADATA = {
         "content_type": "video",
     },
 }
+
+
+def extract_thumb(item: dict) -> str:
+    """Extract thumbnail URL from media_urls (the .jpg entry)."""
+    for u in item.get("media_urls", []):
+        path_part = u.split("?")[0]
+        if path_part.endswith((".jpg", ".jpeg", ".png", ".webp")):
+            return u
+    return ""
 
 
 def load_pool_index() -> dict[str, dict]:
@@ -123,15 +132,7 @@ def main():
 
             content_id = f"{pool_item['platform']}_{content_key}"
             caption = pool_item.get("text", "")
-            transcript = pool_item.get("transcript", "")
-            if transcript:
-                caption += f"\n\nTranscript: {transcript}"
-            sound_name = pool_item.get("sound_name", "")
-            sound_author = pool_item.get("sound_author", "")
-            if sound_name:
-                caption += f"\n\nSound: {sound_name}"
-                if sound_author:
-                    caption += f" by {sound_author}"
+            thumb = extract_thumb(pool_item)
 
             try:
                 ingest_content(
@@ -141,8 +142,14 @@ def main():
                     video_path=media_path,
                     caption=caption,
                     creator=pool_item.get("author", ""),
+                    thumb=thumb,
                     hashtags=pool_item.get("hashtags", []),
                     content_type=content_type,
+                    likes=pool_item.get("likes", 0),
+                    views=pool_item.get("views", 0),
+                    comments=pool_item.get("comments", 0),
+                    transcript=pool_item.get("transcript", ""),
+                    sound_name=pool_item.get("sound_name", ""),
                 )
                 success += 1
             except Exception as e:
@@ -171,7 +178,7 @@ def main():
                 failed += 1
 
         else:
-            # Unmapped file (images, etc.) — ingest with filename as caption
+            # Unmapped file — ingest with filename as caption
             content_id = f"unknown_{file_stem[:16]}"
             caption = file_stem.replace("_", " ").replace("-", " ")
 

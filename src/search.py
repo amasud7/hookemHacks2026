@@ -43,6 +43,10 @@ def _vector_search_pipeline(
                 "url": 1,
                 "creator": 1,
                 "caption": 1,
+                "thumb": 1,
+                "likes": 1,
+                "views": 1,
+                "comments": 1,
                 "score": {"$meta": "vectorSearchScore"},
             }
         },
@@ -79,6 +83,8 @@ def reciprocal_rank_fusion(
 def search(
     query: str = "",
     query_vector: list[float] | None = None,
+    text_query_vector: list[float] | None = None,
+    audio_query_vector: list[float] | None = None,
     preset: str = "default",
     weights: dict[str, float] | None = None,
     limit: int = 10,
@@ -88,7 +94,9 @@ def search(
 
     Args:
         query: Natural language search query (used if query_vector not provided)
-        query_vector: Pre-computed embedding vector (for multimodal inputs)
+        query_vector: Default embedding vector used for all modalities
+        text_query_vector: Override vector for text_embedding search (e.g. from audio transcript)
+        audio_query_vector: Override vector for audio_embedding search (e.g. raw audio waveform)
         preset: One of QUERY_PRESETS keys ("describe", "reenact", "vibe", "quote", "default")
         weights: Custom weights dict {"text": float, "visual": float, "audio": float}.
                  Overrides preset if provided.
@@ -106,10 +114,10 @@ def search(
     if platform:
         filters["platform"] = {"$eq": platform}
 
-    # Run 3 separate vector searches (one per modality)
+    # Run 3 separate vector searches, using per-modality vectors when available
     text_results = _vector_search_pipeline(
         path="text_embedding",
-        query_vector=query_vector,
+        query_vector=text_query_vector or query_vector,
         limit=limit,
         num_candidates=num_candidates,
         filters=filters or None,
@@ -126,7 +134,7 @@ def search(
     audio_filters = {**(filters or {}), "has_audio": {"$eq": True}}
     audio_results = _vector_search_pipeline(
         path="audio_embedding",
-        query_vector=query_vector,
+        query_vector=audio_query_vector or query_vector,
         limit=limit,
         num_candidates=num_candidates,
         filters=audio_filters,
