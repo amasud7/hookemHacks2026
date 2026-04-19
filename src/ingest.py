@@ -6,6 +6,7 @@ from src.describe import describe_video, describe_image
 from src.embeddings import embed_text, embed_video, embed_audio
 from src.media import extract_audio
 from src.models import ContentDocument
+from src.transcribe import transcribe_audio as whisper_transcribe
 
 
 def ingest_content(
@@ -76,11 +77,18 @@ def ingest_content(
                 audio_mime = "audio/mpeg"
                 extracted.unlink()
 
-    # 2. Embed audio — from provided bytes or extracted above
+    # 2. Embed audio + transcribe with Whisper if no transcript provided
     if audio_bytes is not None:
         has_audio = True
         print(f"  Embedding audio for {content_id}...")
         audio_emb = embed_audio(audio_bytes, mime_type=audio_mime)
+
+        if not transcript:
+            print(f"  Transcribing audio with Whisper for {content_id}...")
+            suffix = ".mp3" if "mpeg" in audio_mime else ".mp4" if "mp4" in audio_mime else ".webm"
+            transcript = whisper_transcribe(audio_bytes, suffix=suffix)
+            if transcript:
+                print(f"  Transcript: {transcript[:100]}{'...' if len(transcript) > 100 else ''}")
 
     # 3. Generate and embed video description (action-focused, lighting-invariant)
     vid_bytes = video_bytes

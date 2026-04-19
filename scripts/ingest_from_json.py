@@ -19,6 +19,7 @@ from pathlib import Path
 from urllib.request import urlopen, Request
 
 from src.ingest import ingest_content
+from src.media import extract_audio
 from src.db import get_collection
 
 MEDIA_DIR = Path("frontend/media")
@@ -213,7 +214,7 @@ def main():
                         video_bytes = video_path.read_bytes()
                         print(f"  Video: {len(video_bytes) / 1024 / 1024:.1f} MB")
 
-                # Download audio if separate URL provided
+                # Get audio: from separate URL, or extract from downloaded video
                 audio_bytes = None
                 audio_url = item.get("audio_url", "")
                 if audio_url:
@@ -221,6 +222,17 @@ def main():
                     audio_bytes = download_bytes(audio_url)
                     if audio_bytes:
                         print(f"  Audio: {len(audio_bytes) / 1024:.0f} KB")
+
+                # If no separate audio URL but we have a video, extract audio with ffmpeg
+                if audio_bytes is None and video_bytes is not None:
+                    video_file = MEDIA_DIR / f"{content_id}_video.mp4"
+                    if video_file.exists():
+                        print(f"  Extracting audio from video...")
+                        audio_path = extract_audio(video_file)
+                        if audio_path is not None:
+                            audio_bytes = audio_path.read_bytes()
+                            print(f"  Extracted audio: {len(audio_bytes) / 1024:.0f} KB")
+                            audio_path.unlink()
 
                 # Parse created_at
                 created_at = None
@@ -239,7 +251,7 @@ def main():
                         video_bytes=video_bytes,
                         video_mime="video/mp4",
                         audio_bytes=audio_bytes,
-                        audio_mime="audio/mp4",
+                        audio_mime="audio/mpeg" if audio_bytes and not audio_url else "audio/mp4",
                         caption=caption,
                         creator=item.get("author", ""),
                         thumb=local_thumb,
