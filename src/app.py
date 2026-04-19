@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Form, File, UploadFile, HTTPException
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.embeddings import embed_video, embed_audio, embed_query
@@ -7,6 +8,11 @@ from src.search import search
 from src.transcribe import transcribe_audio
 
 app = FastAPI(title="Vibely API")
+
+
+@app.get("/")
+async def root():
+    return RedirectResponse("/Vibely.html")
 
 
 @app.post("/api/search")

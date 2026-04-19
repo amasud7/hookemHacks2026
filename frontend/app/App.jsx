@@ -86,7 +86,11 @@ function App() {
         formData.append("preset", overridePreset);
       }
 
-      const res = await fetch("/api/search", { method: "POST", body: formData });
+      const res = await fetch("/api/search", {
+        method: "POST",
+        body: formData,
+        headers: { "ngrok-skip-browser-warning": "true" },
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || `Search failed: ${res.status}`);

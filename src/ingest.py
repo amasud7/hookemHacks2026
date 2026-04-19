@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import datetime
 
 from src.db import get_collection
+from src.describe import describe_video
 from src.embeddings import embed_text, embed_video, embed_audio
 from src.media import extract_audio
 from src.models import ContentDocument
@@ -19,6 +20,7 @@ def ingest_content(
     caption: str = "",
     creator: str = "",
     thumb: str = "",
+    video_url: str = "",
     hashtags: list[str] | None = None,
     duration_seconds: float | None = None,
     content_type: str = "video",
@@ -46,6 +48,8 @@ def ingest_content(
     text_emb = None
     visual_emb = None
     audio_emb = None
+    description_emb = None
+    description = ""
     has_audio = False
 
     # 1. Embed visual content — from bytes or file path
@@ -78,7 +82,18 @@ def ingest_content(
         print(f"  Embedding audio for {content_id}...")
         audio_emb = embed_audio(audio_bytes, mime_type=audio_mime)
 
-    # 3. Embed text (caption + hashtags + transcript)
+    # 3. Generate and embed video description (action-focused, lighting-invariant)
+    vid_bytes = video_bytes
+    if vid_bytes is None and video_path is not None:
+        vid_bytes = Path(video_path).read_bytes() if Path(video_path).exists() else None
+    if vid_bytes is not None and content_type == "video":
+        print(f"  Describing video for {content_id}...")
+        description = describe_video(vid_bytes)
+        if description:
+            print(f"  Description: {description[:100]}{'...' if len(description) > 100 else ''}")
+            description_emb = embed_text(description)
+
+    # 4. Embed text (caption + hashtags + transcript)
     text_blob = caption
     if hashtags:
         text_blob += " " + " ".join(f"#{tag}" for tag in hashtags)
@@ -95,6 +110,7 @@ def ingest_content(
         creator=creator,
         caption=caption,
         thumb=thumb,
+        video_url=video_url,
         hashtags=hashtags or [],
         duration_seconds=duration_seconds,
         content_type=content_type,
@@ -104,10 +120,12 @@ def ingest_content(
         comments=comments,
         transcript=transcript,
         sound_name=sound_name,
+        description=description,
         created_at=created_at,
         text_embedding=text_emb,
         visual_embedding=visual_emb,
         audio_embedding=audio_emb,
+        description_embedding=description_emb,
     )
 
     collection = get_collection()

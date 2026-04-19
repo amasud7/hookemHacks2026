@@ -10,11 +10,13 @@ Usage:
 
 import json
 from pathlib import Path
+from urllib.request import urlopen, Request
 
 from src.ingest import ingest_content
 
 POOL_FILE = Path("content_pool.json")
 DATA_DIR = Path("data/raw")
+MEDIA_DIR = Path("frontend/media")
 
 # Manual mapping: filename prefix → content_pool shortCode/id or manual label
 FILE_TO_CONTENT = {
@@ -70,13 +72,38 @@ MANUAL_METADATA = {
 }
 
 
-def extract_thumb(item: dict) -> str:
-    """Extract thumbnail URL from media_urls (the .jpg entry)."""
+def download_url(url: str, dest: Path, timeout: int = 30) -> bool:
+    """Download a URL to a local file. Skips if already exists."""
+    if dest.exists() and dest.stat().st_size > 0:
+        return True
+    try:
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urlopen(req, timeout=timeout) as resp:
+            dest.write_bytes(resp.read())
+        return True
+    except Exception as e:
+        print(f"    Download failed: {e}")
+        return False
+
+
+def download_media(content_id: str, item: dict) -> tuple[str, str]:
+    """Download thumb and video from CDN to local storage. Returns (local_thumb, local_video) paths."""
+    MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    local_thumb = ""
+    local_video = ""
+
     for u in item.get("media_urls", []):
         path_part = u.split("?")[0]
-        if path_part.endswith((".jpg", ".jpeg", ".png", ".webp")):
-            return u
-    return ""
+        if path_part.endswith((".jpg", ".jpeg", ".png", ".webp")) and not local_thumb:
+            thumb_path = MEDIA_DIR / f"{content_id}_thumb.jpg"
+            if download_url(u, thumb_path):
+                local_thumb = f"/media/{thumb_path.name}"
+        elif path_part.endswith((".mp4", ".mov", ".webm")) and not local_video:
+            video_path = MEDIA_DIR / f"{content_id}_video.mp4"
+            if download_url(u, video_path):
+                local_video = f"/media/{video_path.name}"
+
+    return local_thumb, local_video
 
 
 def load_pool_index() -> dict[str, dict]:
@@ -132,7 +159,10 @@ def main():
 
             content_id = f"{pool_item['platform']}_{content_key}"
             caption = pool_item.get("text", "")
-            thumb = extract_thumb(pool_item)
+
+            # Download media to local storage for serving
+            print(f"  Downloading media...")
+            local_thumb, local_video = download_media(content_id, pool_item)
 
             try:
                 ingest_content(
@@ -142,7 +172,8 @@ def main():
                     video_path=media_path,
                     caption=caption,
                     creator=pool_item.get("author", ""),
-                    thumb=thumb,
+                    thumb=local_thumb,
+                    video_url=local_video,
                     hashtags=pool_item.get("hashtags", []),
                     content_type=content_type,
                     likes=pool_item.get("likes", 0),
