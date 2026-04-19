@@ -44,6 +44,7 @@ def _vector_search_pipeline(
                 "creator": 1,
                 "caption": 1,
                 "thumb": 1,
+                "video_url": 1,
                 "likes": 1,
                 "views": 1,
                 "comments": 1,

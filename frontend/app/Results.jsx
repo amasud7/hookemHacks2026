@@ -24,19 +24,55 @@ function ResultCard({ r, onOpen, i }) {
   const handle = r.handle || (r.creator ? (r.creator.startsWith("@") ? r.creator : `@${r.creator}`) : "");
   const caption = r.caption || "Untitled";
   const thumb = r.thumb || null;
+  const videoUrl = r.video_url || null;
   const matchReason = r.matchReason || (r.score != null ? `${Math.round(r.score * 100)}% match` : "vibe match");
   const aspect = r.aspect || 0.9;
   const h = 220 + aspect * 140;
   const [loaded, setLoaded] = React.useState(false);
+  const [hovered, setHovered] = React.useState(false);
+  const videoRef = React.useRef(null);
+
+  // Autoplay on hover
+  React.useEffect(() => {
+    if (!videoRef.current) return;
+    if (hovered) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(() => {});
+    } else {
+      videoRef.current.pause();
+    }
+  }, [hovered]);
 
   return (
     <article
       className="card"
       style={{ animationDelay: `${i * 35}ms` }}
       onClick={() => onOpen(r)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       <div className="card__media" style={{ height: `${h}px` }}>
-        {thumb ? (
+        {videoUrl ? (
+          <>
+            {thumb && !hovered && (
+              <img
+                src={thumb}
+                alt=""
+                onLoad={() => setLoaded(true)}
+                style={{ opacity: 1, position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 1 }}
+              />
+            )}
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            />
+          </>
+        ) : thumb ? (
           <>
             {!loaded && <div className="card__skel" />}
             <img
@@ -62,9 +98,11 @@ function ResultCard({ r, onOpen, i }) {
             </div>
           )}
         </div>
-        <div className="card__play">
-          <window.Icon.Play width="20" height="20" />
-        </div>
+        {!hovered && (
+          <div className="card__play">
+            <window.Icon.Play width="20" height="20" />
+          </div>
+        )}
         <div className="card__match">{matchReason}</div>
       </div>
       <div className="card__body">
@@ -112,17 +150,22 @@ function ResultDetail({ result, onClose }) {
           <window.Icon.Close width="18" height="18" />
         </button>
         <div className="modal__video">
-          {result.thumb ? (
+          {result.video_url ? (
+            <video
+              src={result.video_url}
+              autoPlay
+              loop
+              playsInline
+              controls
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            />
+          ) : result.thumb ? (
             <img src={result.thumb} alt="" />
           ) : (
             <div className="card__placeholder" style={{ minHeight: "100%" }}>
               <div className="card__placeholder-caption" style={{ fontSize: "22px" }}>{result.caption}</div>
             </div>
           )}
-          <div className="modal__scrim" />
-          <button className="modal__play">
-            <window.Icon.Play width="28" height="28" />
-          </button>
           {result.duration && (
             <div className="modal__vid-meta">
               <PlatformBadge platform={result.platform} />

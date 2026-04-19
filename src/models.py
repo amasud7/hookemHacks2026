@@ -10,7 +10,8 @@ class ContentDocument(BaseModel):
     url: str
     creator: str = ""
     caption: str = ""
-    thumb: str = ""  # thumbnail URL
+    thumb: str = ""  # local thumbnail path (served by our server)
+    video_url: str = ""  # local video path (served by our server)
     hashtags: list[str] = Field(default_factory=list)
     duration_seconds: float | None = None
     content_type: str = "video"  # video, slideshow, image
@@ -47,6 +48,7 @@ class SearchResult(BaseModel):
     creator: str = ""
     caption: str = ""
     thumb: str = ""
+    video_url: str = ""
     likes: int = 0
     views: int = 0
     comments: int = 0
