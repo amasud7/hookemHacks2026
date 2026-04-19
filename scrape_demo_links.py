@@ -12,8 +12,13 @@ DEMO_CONTENT = {
     "whip_for_claude_code": "https://www.instagram.com/reel/DW7u1kPDc5Z/",
     "cat_doing_scuba": "https://www.instagram.com/reel/DXOCjsnDMMd/",
     "wilson_lo_siento": "https://www.instagram.com/reel/DU3rGLLDoVX/",
-    "not_quite_my_tempo": "https://www.tiktok.com/t/ZTkuNrEwp/",
-    "sopranos_ooohhh": "https://www.tiktok.com/t/ZTkuNQqLK/",
+    "motorcycle_scuba": "https://www.instagram.com/p/DW_0ut8jpp-/",
+    "nickwilde_scuba": "https://www.instagram.com/p/DWdlzFqDFS5/",
+    "charles_scuba": "https://www.instagram.com/p/DXNQSHQksVC/",
+    "speed_jump1": "https://www.instagram.com/p/DXSnF_lCOb9/",
+    "speed_jump2": "https://www.instagram.com/p/C-Oe7MjNqd6/",
+    "speed_jump3": "https://www.instagram.com/p/DTbI_Vjjdsx/",
+    "point_eye": "https://www.instagram.com/p/DNYGxHCJ7Zr/",
 }
 
 OUTPUT_FILE = "content_pool.json"

@@ -3,9 +3,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from groq import Groq
+import anthropic
 
-from src.config import GROQ_API_KEY
+from src.config import ANTHROPIC_API_KEY
 
 _client = None
 
@@ -13,7 +13,7 @@ _client = None
 def _get_client():
     global _client
     if _client is None:
-        _client = Groq(api_key=GROQ_API_KEY)
+        _client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     return _client
 
 
@@ -62,10 +62,10 @@ def extract_frames(video_bytes: bytes, num_frames: int = 4, suffix: str = ".mp4"
 
 
 def describe_video(video_bytes: bytes, suffix: str = ".mp4") -> str:
-    """Generate a text description of video content using Groq vision.
+    """Generate a text description of video content using Claude.
 
-    Extracts key frames, sends them to Groq's vision model, and returns
-    a concise description focused on actions and events (not colors/lighting).
+    Extracts key frames, sends them to Claude's vision, and returns
+    a concise description focused on actions and events.
     Returns empty string on failure.
     """
     try:
@@ -73,22 +73,26 @@ def describe_video(video_bytes: bytes, suffix: str = ".mp4") -> str:
         if not frames:
             return ""
 
-        image_parts = [
+        image_blocks = [
             {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{base64.b64encode(f).decode()}"
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": base64.b64encode(f).decode(),
                 },
             }
             for f in frames
         ]
 
-        response = _get_client().chat.completions.create(
-            model="meta-llama/llama-4-scout-17b-16e-instruct",
+        response = _get_client().messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=150,
             messages=[
                 {
                     "role": "user",
                     "content": [
+                        *image_blocks,
                         {
                             "type": "text",
                             "text": (
@@ -98,31 +102,38 @@ def describe_video(video_bytes: bytes, suffix: str = ".mp4") -> str:
                                 "Be specific and concise."
                             ),
                         },
-                        *image_parts,
                     ],
                 }
             ],
-            max_tokens=150,
         )
-        return response.choices[0].message.content.strip()
+        return response.content[0].text.strip()
     except Exception as e:
         print(f"  Video description failed: {e}")
         return ""
 
 
 def describe_image(image_bytes: bytes) -> str:
-    """Generate a text description of an image using Groq vision.
+    """Generate a text description of an image using Claude.
 
     Returns a concise description focused on subjects and context.
     Returns empty string on failure.
     """
     try:
-        response = _get_client().chat.completions.create(
-            model="meta-llama/llama-4-scout-17b-16e-instruct",
+        response = _get_client().messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=150,
             messages=[
                 {
                     "role": "user",
                     "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": base64.b64encode(image_bytes).decode(),
+                            },
+                        },
                         {
                             "type": "text",
                             "text": (
@@ -131,18 +142,11 @@ def describe_image(image_bytes: bytes) -> str:
                                 "Be specific and concise."
                             ),
                         },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64.b64encode(image_bytes).decode()}"
-                            },
-                        },
                     ],
                 }
             ],
-            max_tokens=150,
         )
-        return response.choices[0].message.content.strip()
+        return response.content[0].text.strip()
     except Exception as e:
-        print(f"  Video description failed: {e}")
+        print(f"  Image description failed: {e}")
         return ""

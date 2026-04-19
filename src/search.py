@@ -5,11 +5,11 @@ from src.config import VECTOR_INDEX_NAME
 
 # Modality weight presets for different query types
 QUERY_PRESETS = {
-    "describe": {"text": 1.0, "visual": 1.5, "audio": 0.3, "description": 1.5},
-    "reenact":  {"text": 0.3, "visual": 0.5, "audio": 2.0, "description": 0.3},
-    "vibe":     {"text": 1.0, "visual": 1.0, "audio": 1.0, "description": 1.0},
-    "quote":    {"text": 2.0, "visual": 0.3, "audio": 0.5, "description": 0.5},
-    "default":  {"text": 1.0, "visual": 1.0, "audio": 1.0, "description": 1.0},
+    "describe": {"text": 2.5, "visual": 1.0, "audio": 0.2, "description": 2.0},
+    "reenact":  {"text": 0.5, "visual": 0.3, "audio": 2.5, "description": 0.3},
+    "vibe":     {"text": 1.5, "visual": 1.0, "audio": 0.8, "description": 1.5},
+    "quote":    {"text": 3.0, "visual": 0.2, "audio": 0.5, "description": 0.5},
+    "default":  {"text": 2.0, "visual": 1.0, "audio": 0.8, "description": 1.5},
 }
 
 

@@ -486,15 +486,14 @@ mark { background: var(--accent-soft); color: var(--ink); border-radius: 3px; pa
 
 /* Masonry grid */
 .grid {
-  columns: 4 240px;
-  column-gap: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
 }
-:root[data-density="cozy"] .grid { columns: 3 280px; column-gap: 24px; }
-:root[data-density="dense"] .grid { columns: 5 200px; column-gap: 16px; }
+:root[data-density="cozy"] .grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+:root[data-density="dense"] .grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
 
 .card {
-  break-inside: avoid;
-  margin-bottom: 20px;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 18px;
