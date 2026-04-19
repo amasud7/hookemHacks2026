@@ -1,35 +1,46 @@
-"""Video frame product analysis: identify products via Gemini vision, find listings via SerpAPI."""
+"""Video frame product analysis: identify products via Claude vision, find listings via SerpAPI."""
 
+import base64
 import json
 
-from google import genai
-from google.genai import types
+import anthropic
 from serpapi import GoogleSearch
 
-from src.config import GOOGLE_API_KEY, SERPAPI_API_KEY
+from src.config import ANTHROPIC_API_KEY, SERPAPI_API_KEY
 
-_client: genai.Client | None = None
+_client: anthropic.Anthropic | None = None
 
 
-def _get_client() -> genai.Client:
+def _get_client() -> anthropic.Anthropic:
     global _client
     if _client is None:
-        _client = genai.Client(api_key=GOOGLE_API_KEY)
+        _client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     return _client
 
 
 def identify_products(image_bytes: bytes, mime_type: str = "image/jpeg") -> list[dict]:
-    """Use Gemini vision to identify purchasable products in an image frame.
+    """Use Claude vision to identify purchasable products in an image frame.
 
     Returns a list of dicts: [{"name": "...", "search_query": "..."}]
     """
-    client = _get_client()
-
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=[
-            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-            """Analyze this image and identify all purchasable products visible.
+    response = _get_client().messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=500,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": mime_type,
+                            "data": base64.b64encode(image_bytes).decode(),
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": """Analyze this image and identify all purchasable products visible.
 For each product, provide:
 - "name": a short, human-readable product name
 - "search_query": a Google Shopping search query that would find this exact product
@@ -39,17 +50,21 @@ Ignore: people, backgrounds, text overlays.
 
 Return ONLY a JSON array. If no products are found, return [].
 Example: [{"name": "White Nike Air Force 1", "search_query": "Nike Air Force 1 07 white"}]""",
+                    },
+                ],
+            }
         ],
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-        ),
     )
 
     try:
-        products = json.loads(response.text)
+        text = response.content[0].text
+        # Handle case where Claude wraps JSON in markdown code block
+        if "```" in text:
+            text = text.split("```json")[-1].split("```")[0] if "```json" in text else text.split("```")[1].split("```")[0]
+        products = json.loads(text.strip())
         if isinstance(products, list):
             return products
-    except (json.JSONDecodeError, TypeError):
+    except (json.JSONDecodeError, TypeError, IndexError):
         pass
     return []
 
