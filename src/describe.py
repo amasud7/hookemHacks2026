@@ -108,3 +108,41 @@ def describe_video(video_bytes: bytes, suffix: str = ".mp4") -> str:
     except Exception as e:
         print(f"  Video description failed: {e}")
         return ""
+
+
+def describe_image(image_bytes: bytes) -> str:
+    """Generate a text description of an image using Groq vision.
+
+    Returns a concise description focused on subjects and context.
+    Returns empty string on failure.
+    """
+    try:
+        response = _get_client().chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Describe this image in 1-2 sentences. "
+                                "Focus on SUBJECTS, ACTIONS, and CONTEXT — not colors, lighting, or image quality. "
+                                "Be specific and concise."
+                            ),
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64.b64encode(image_bytes).decode()}"
+                            },
+                        },
+                    ],
+                }
+            ],
+            max_tokens=150,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"  Video description failed: {e}")
+        return ""

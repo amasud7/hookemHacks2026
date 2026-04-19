@@ -1,6 +1,9 @@
-from src.embeddings import _get_client
+from groq import Groq
+from src.config import GROQ_API_KEY
 
 VALID_INTENTS = {"describe", "reenact", "vibe", "quote"}
+
+_client = None
 
 _CLASSIFY_PROMPT = """Classify this short-form content search query into exactly ONE category.
 
@@ -16,18 +19,26 @@ Query: "{query}"
 """
 
 
+def _get_client():
+    global _client
+    if _client is None:
+        _client = Groq(api_key=GROQ_API_KEY)
+    return _client
+
+
 def classify_query(query: str) -> str:
-    """Classify a search query into an intent preset.
+    """Classify a search query into an intent preset using Groq.
 
     Returns one of: "describe", "reenact", "vibe", "quote".
-    Falls back to "describe" on any error (most common query type).
+    Falls back to "describe" on any error.
     """
     try:
-        result = _get_client().models.generate_content(
-            model="gemini-2.0-flash-lite",
-            contents=_CLASSIFY_PROMPT.format(query=query),
+        response = _get_client().chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": _CLASSIFY_PROMPT.format(query=query)}],
+            max_tokens=10,
         )
-        intent = result.text.strip().lower().split()[0]  # Take first word only
+        intent = response.choices[0].message.content.strip().lower().split()[0]
         if intent in VALID_INTENTS:
             return intent
         return "describe"

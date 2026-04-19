@@ -2,7 +2,7 @@ from pathlib import Path
 from datetime import datetime
 
 from src.db import get_collection
-from src.describe import describe_video
+from src.describe import describe_video, describe_image
 from src.embeddings import embed_text, embed_video, embed_audio
 from src.media import extract_audio
 from src.models import ContentDocument
@@ -86,9 +86,13 @@ def ingest_content(
     vid_bytes = video_bytes
     if vid_bytes is None and video_path is not None:
         vid_bytes = Path(video_path).read_bytes() if Path(video_path).exists() else None
-    if vid_bytes is not None and content_type == "video":
-        print(f"  Describing video for {content_id}...")
-        description = describe_video(vid_bytes)
+    if vid_bytes is not None:
+        if content_type == "video":
+            print(f"  Describing video for {content_id}...")
+            description = describe_video(vid_bytes)
+        else:
+            print(f"  Describing image for {content_id}...")
+            description = describe_image(vid_bytes)
         if description:
             print(f"  Description: {description[:100]}{'...' if len(description) > 100 else ''}")
             description_emb = embed_text(description)

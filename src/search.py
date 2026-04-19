@@ -57,24 +57,24 @@ def _vector_search_pipeline(
     return list(collection.aggregate(pipeline))
 
 
-def reciprocal_rank_fusion(
+def weighted_score_fusion(
     result_lists: list[list[dict]],
     weights: list[float],
-    k: int = 60,
 ) -> list[dict]:
-    """Combine multiple ranked result lists using weighted Reciprocal Rank Fusion.
+    """Combine multiple result lists using weighted similarity scores.
 
-    RRF score for a document = sum over lists of: weight * 1/(k + rank + 1)
-    Higher k dampens the effect of rank differences.
+    Uses the actual vectorSearchScore (cosine similarity) from each modality,
+    weighted by the preset. This gives real differentiation — a strong match
+    (0.95) vs a weak one (0.3) produces very different fused scores.
     """
     scores: dict[str, float] = {}
     docs: dict[str, dict] = {}
 
     for results, weight in zip(result_lists, weights):
-        for rank, doc in enumerate(results):
+        for doc in results:
             doc_id = doc["content_id"]
-            scores[doc_id] = scores.get(doc_id, 0.0) + weight * (1.0 / (k + rank + 1))
-            # Keep the doc data (latest version wins, but they should be identical)
+            sim_score = doc.get("score", 0.0)
+            scores[doc_id] = scores.get(doc_id, 0.0) + weight * sim_score
             docs[doc_id] = doc
 
     ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
@@ -149,8 +149,8 @@ def search(
         filters=filters or None,
     )
 
-    # Combine with weighted RRF
-    fused = reciprocal_rank_fusion(
+    # Combine with weighted similarity scores
+    fused = weighted_score_fusion(
         result_lists=[text_results, visual_results, audio_results, description_results],
         weights=[w["text"], w["visual"], w["audio"], w.get("description", 1.0)],
     )
