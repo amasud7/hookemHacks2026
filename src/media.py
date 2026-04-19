@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -6,9 +7,12 @@ from pathlib import Path
 def extract_audio(video_path: str | Path, output_path: str | Path | None = None) -> Path | None:
     """Extract audio track from a video file to mp3 using ffmpeg.
 
-    Returns the output path on success, None if the video has no audio track.
+    Returns the output path on success, None if ffmpeg is unavailable or video has no audio track.
     If output_path is not provided, creates a temp file.
     """
+    if shutil.which("ffmpeg") is None:
+        return None
+
     video_path = Path(video_path)
     if output_path is None:
         output_path = Path(tempfile.mktemp(suffix=".mp3"))

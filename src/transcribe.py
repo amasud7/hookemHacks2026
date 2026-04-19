@@ -1,31 +1,32 @@
-import tempfile
-from pathlib import Path
+import io
 
-import whisper
+from groq import Groq
 
-_model = None
+from src.config import GROQ_API_KEY
+
+_client: Groq | None = None
 
 
-def _get_model():
-    global _model
-    if _model is None:
-        _model = whisper.load_model("small")
-    return _model
+def _get_client() -> Groq:
+    global _client
+    if _client is None:
+        _client = Groq(api_key=GROQ_API_KEY)
+    return _client
 
 
 def transcribe_audio(audio_bytes: bytes, suffix: str = ".webm") -> str:
-    """Transcribe audio bytes to text using local Whisper model.
+    """Transcribe audio bytes to text using Groq Whisper API.
 
     Returns the transcribed text, or empty string on failure.
-    Model loads once (~2s first call), transcription ~1-2s per short clip on CPU.
     """
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
-        f.write(audio_bytes)
-        tmp_path = f.name
     try:
-        result = _get_model().transcribe(tmp_path)
-        return result["text"].strip()
-    except Exception:
+        # Map suffix to a filename Groq can accept
+        filename = f"audio{suffix}"
+        transcription = _get_client().audio.transcriptions.create(
+            model="whisper-large-v3-turbo",
+            file=(filename, io.BytesIO(audio_bytes)),
+        )
+        return transcription.text.strip()
+    except Exception as e:
+        print(f"Groq transcription error: {e}")
         return ""
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)

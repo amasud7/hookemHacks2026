@@ -1,152 +1,75 @@
+"""Generate text descriptions of video/image content using Gemini vision.
+
+No ffmpeg dependency — sends video bytes directly to Gemini which samples frames natively.
+Falls back to Claude for image description.
+"""
+
 import base64
-import subprocess
-import tempfile
-from pathlib import Path
+import json
 
-import anthropic
+from google import genai
+from google.genai import types
 
-from src.config import ANTHROPIC_API_KEY
+from src.config import GOOGLE_API_KEY
 
-_client = None
+_client: genai.Client | None = None
 
 
-def _get_client():
+def _get_client() -> genai.Client:
     global _client
     if _client is None:
-        _client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        _client = genai.Client(api_key=GOOGLE_API_KEY)
     return _client
 
 
-def extract_frames(video_bytes: bytes, num_frames: int = 4, suffix: str = ".mp4") -> list[bytes]:
-    """Extract evenly-spaced JPEG frames from video using ffmpeg."""
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
-        f.write(video_bytes)
-        video_path = f.name
-
-    out_dir = tempfile.mkdtemp()
-    try:
-        # Use ffmpeg to extract frames at even intervals
-        subprocess.run(
-            [
-                "ffmpeg", "-i", video_path,
-                "-vf", f"select=not(mod(n\\,max(1\\,floor(n_frames/{num_frames})))),scale=512:-1",
-                "-vsync", "vfr",
-                "-frames:v", str(num_frames),
-                "-q:v", "3",
-                f"{out_dir}/frame_%03d.jpg",
-            ],
-            check=True,
-            capture_output=True,
-        )
-    except subprocess.CalledProcessError:
-        # Fallback: just grab first N frames
-        subprocess.run(
-            [
-                "ffmpeg", "-i", video_path,
-                "-vf", "fps=1,scale=512:-1",
-                "-frames:v", str(num_frames),
-                "-q:v", "3",
-                f"{out_dir}/frame_%03d.jpg",
-            ],
-            capture_output=True,
-        )
-
-    frames = []
-    for frame_path in sorted(Path(out_dir).glob("frame_*.jpg")):
-        frames.append(frame_path.read_bytes())
-        frame_path.unlink()
-
-    Path(video_path).unlink(missing_ok=True)
-    Path(out_dir).rmdir()
-    return frames
-
-
 def describe_video(video_bytes: bytes, suffix: str = ".mp4") -> str:
-    """Generate a text description of video content using Claude.
+    """Generate a text description of video content using Gemini vision.
 
-    Extracts key frames, sends them to Claude's vision, and returns
-    a concise description focused on actions and events.
+    Sends raw video bytes — Gemini samples 32 frames automatically.
+    Returns a concise description focused on actions and events.
     Returns empty string on failure.
     """
+    mime_map = {".mp4": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm"}
+    mime_type = mime_map.get(suffix.lower(), "video/mp4")
+
     try:
-        frames = extract_frames(video_bytes, num_frames=4, suffix=suffix)
-        if not frames:
-            return ""
-
-        image_blocks = [
-            {
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": "image/jpeg",
-                    "data": base64.b64encode(f).decode(),
-                },
-            }
-            for f in frames
-        ]
-
-        response = _get_client().messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=150,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        *image_blocks,
-                        {
-                            "type": "text",
-                            "text": (
-                                "These are frames from a short-form video (TikTok/Instagram Reel). "
-                                "Describe what is HAPPENING in this video in 1-2 sentences. "
-                                "Focus on ACTIONS, MOTION, EVENTS, and SUBJECTS — not colors, lighting, or image quality. "
-                                "Be specific and concise."
-                            ),
-                        },
-                    ],
-                }
+        response = _get_client().models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
+                types.Part.from_bytes(data=video_bytes, mime_type=mime_type),
+                (
+                    "These are frames from a short-form video (TikTok/Instagram Reel). "
+                    "Describe what is HAPPENING in this video in 1-2 sentences. "
+                    "Focus on ACTIONS, MOTION, EVENTS, and SUBJECTS — not colors, lighting, or image quality. "
+                    "Be specific and concise."
+                ),
             ],
         )
-        return response.content[0].text.strip()
+        return response.text.strip()
     except Exception as e:
         print(f"  Video description failed: {e}")
         return ""
 
 
 def describe_image(image_bytes: bytes) -> str:
-    """Generate a text description of an image using Claude.
+    """Generate a text description of an image using Gemini vision.
 
     Returns a concise description focused on subjects and context.
     Returns empty string on failure.
     """
     try:
-        response = _get_client().messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=150,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/jpeg",
-                                "data": base64.b64encode(image_bytes).decode(),
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": (
-                                "Describe this image in 1-2 sentences. "
-                                "Focus on SUBJECTS, ACTIONS, and CONTEXT — not colors, lighting, or image quality. "
-                                "Be specific and concise."
-                            ),
-                        },
-                    ],
-                }
+        response = _get_client().models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                (
+                    "Describe this image in 1-2 sentences. "
+                    "Focus on SUBJECTS, ACTIONS, and CONTEXT — not colors, lighting, or image quality. "
+                    "Be specific and concise."
+                ),
             ],
         )
-        return response.content[0].text.strip()
+        return response.text.strip()
     except Exception as e:
         print(f"  Image description failed: {e}")
         return ""

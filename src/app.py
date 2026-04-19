@@ -1,6 +1,8 @@
+import os
+
 from fastapi import FastAPI, Form, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
-from fastapi.staticfiles import StaticFiles
 
 from src.embeddings import embed_video, embed_audio, embed_query
 from src.intent import classify_query
@@ -10,10 +12,12 @@ from src.transcribe import transcribe_audio
 
 app = FastAPI(title="Vibely API")
 
-
-@app.get("/")
-async def root():
-    return RedirectResponse("/Vibely.html")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.post("/api/search")
@@ -102,5 +106,7 @@ async def api_products(file: UploadFile = File(...)):
     }
 
 
-# Serve frontend static files — must come after API routes
-app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+# Local dev: serve frontend static files
+if not os.environ.get("VERCEL"):
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
