@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.embeddings import embed_video, embed_audio, embed_query
 from src.intent import classify_query
+from src.products import analyze_frame
 from src.search import search
 from src.transcribe import transcribe_audio
 
@@ -81,6 +82,23 @@ async def api_search(
         "query_mode": mode,
         "detected_intent": detected_intent,
         "transcript": transcript,
+    }
+
+
+@app.post("/api/products")
+async def api_products(file: UploadFile = File(...)):
+    """Analyze a video frame and return product listings from Google Shopping."""
+    file_bytes = await file.read()
+    mime_type = file.content_type or "image/jpeg"
+
+    try:
+        products = analyze_frame(file_bytes, mime_type)
+    except Exception as e:
+        raise HTTPException(500, f"Product analysis failed: {e}")
+
+    return {
+        "products": products,
+        "count": len(products),
     }
 
 
