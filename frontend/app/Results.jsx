@@ -137,11 +137,64 @@ function ResultsGrid({ results, onOpen }) {
   );
 }
 
+function ProductCard({ product }) {
+  return (
+    <div className="product">
+      <div className="product__name">{product.name}</div>
+      <div className="product__listings">
+        {product.listings && product.listings.map((l, i) => (
+          <a key={i} href={l.link} target="_blank" rel="noopener noreferrer" className="product__listing">
+            {l.thumbnail && <img src={l.thumbnail} alt="" className="product__thumb" />}
+            <div className="product__info">
+              <div className="product__title">{l.title}</div>
+              <div className="product__price">{l.price}</div>
+              <div className="product__source">{l.source}</div>
+            </div>
+          </a>
+        ))}
+        {(!product.listings || product.listings.length === 0) && (
+          <div className="product__empty">No listings found</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ResultDetail({ result, onClose }) {
   if (!result) return null;
   const handle = result.handle || (result.creator ? (result.creator.startsWith("@") ? result.creator : `@${result.creator}`) : "");
   const matchReason = result.matchReason || (result.score != null ? `${Math.round(result.score * 100)}% match` : "vibe match");
   const platformLabel = result.platform === "tiktok" ? "TikTok" : result.platform === "instagram" ? "Instagram" : result.platform;
+
+  const videoRef = React.useRef(null);
+  const [products, setProducts] = React.useState(null);
+  const [loadingProducts, setLoadingProducts] = React.useState(false);
+
+  const identifyProducts = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Capture current frame to canvas
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+
+    const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.9));
+    const form = new FormData();
+    form.append("file", blob, "frame.jpg");
+
+    setLoadingProducts(true);
+    try {
+      const res = await fetch("/api/products", { method: "POST", body: form });
+      const data = await res.json();
+      setProducts(data.products || []);
+    } catch (e) {
+      console.error("Product analysis failed:", e);
+      setProducts([]);
+    }
+    setLoadingProducts(false);
+  };
 
   return (
     <div className="modal" onClick={onClose}>
@@ -152,6 +205,7 @@ function ResultDetail({ result, onClose }) {
         <div className="modal__video">
           {result.video_url ? (
             <video
+              ref={videoRef}
               src={result.video_url}
               autoPlay
               loop
@@ -205,6 +259,11 @@ function ResultDetail({ result, onClose }) {
                 <window.Icon.Play width="14" height="14" /> open on {platformLabel}
               </button>
             )}
+            {result.video_url && (
+              <button className="btn btn--shop" onClick={identifyProducts} disabled={loadingProducts}>
+                {loadingProducts ? "Analyzing..." : "Identify Products"}
+              </button>
+            )}
             <button className="btn btn--ghost">
               <window.Icon.Bookmark width="14" height="14" /> save
             </button>
@@ -212,6 +271,17 @@ function ResultDetail({ result, onClose }) {
               <window.Icon.Share width="14" height="14" /> share
             </button>
           </div>
+
+          {products !== null && (
+            <div className="modal__products">
+              <h3 className="modal__products-title">Products Found</h3>
+              {products.length === 0 ? (
+                <p className="product__empty">No purchasable products detected in this frame.</p>
+              ) : (
+                products.map((p, i) => <ProductCard key={i} product={p} />)
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

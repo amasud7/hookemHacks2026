@@ -19,5 +19,8 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 # Anthropic (for video/image descriptions)
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
+# SerpAPI (for Google Shopping product search)
+SERPAPI_API_KEY = os.environ.get("SERPAPI_API_KEY", "")
+
 # Vector search index name (single consolidated index for M0 free tier)
 VECTOR_INDEX_NAME = "idx_all_embeddings"
