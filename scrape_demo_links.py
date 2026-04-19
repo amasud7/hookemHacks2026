@@ -6,7 +6,6 @@ from dataclasses import asdict
 from scrapers import InstagramScraper, TikTokScraper
 
 DEMO_CONTENT = {
-    "sopranos_ohhh": "https://www.instagram.com/reel/DFIaEarNVA9/",
     "cats_dancing_dryer": "https://www.instagram.com/reel/DWyoxiCDGKg/",
     "6_ai_5_parachutes": "https://www.instagram.com/reel/DUn6HCeE4by/",
     "whip_for_claude_code": "https://www.instagram.com/reel/DW7u1kPDc5Z/",
@@ -19,8 +18,15 @@ DEMO_CONTENT = {
     "speed_jump2": "https://www.instagram.com/p/C-Oe7MjNqd6/",
     "speed_jump3": "https://www.instagram.com/p/DTbI_Vjjdsx/",
     "point_eye": "https://www.instagram.com/p/DNYGxHCJ7Zr/",
+    "audio1": "https://www.instagram.com/p/DWeJZVViarj/",
+    "withu1": "https://www.instagram.com/p/DTr6PODAGlh/",
+    "withu2": "https://www.instagram.com/p/DV6TuqGlHte/",
+    "withu3": "https://www.instagram.com/p/Cu-47g8oPCS/",
+    "withu4": "https://www.instagram.com/p/DTWVrpMja4C/",
+    "withu5": "https://www.instagram.com/explore/search/keyword/?q=basement%20covet%20memes",
+    "outfit": "https://www.instagram.com/p/DUsJWK0CKLX/",
+    "outfit1": "https://www.instagram.com/p/DT6B6Aokt75/",
 }
-
 OUTPUT_FILE = "content_pool.json"
 
 
