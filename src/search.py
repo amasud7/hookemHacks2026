@@ -5,11 +5,11 @@ from src.config import VECTOR_INDEX_NAME
 
 # Modality weight presets for different query types
 QUERY_PRESETS = {
-    "describe": {"text": 1.0, "visual": 1.5, "audio": 0.3},   # "video where a cat..."
-    "reenact":  {"text": 0.3, "visual": 0.5, "audio": 2.0},   # mimicking sounds/dialogue
-    "vibe":     {"text": 1.0, "visual": 1.0, "audio": 1.0},   # "cozy autumn feel"
-    "quote":    {"text": 2.0, "visual": 0.3, "audio": 0.5},   # "the one where they say..."
-    "default":  {"text": 1.0, "visual": 1.0, "audio": 1.0},
+    "describe": {"text": 1.0, "visual": 1.5, "audio": 0.3, "description": 1.5},
+    "reenact":  {"text": 0.3, "visual": 0.5, "audio": 2.0, "description": 0.3},
+    "vibe":     {"text": 1.0, "visual": 1.0, "audio": 1.0, "description": 1.0},
+    "quote":    {"text": 2.0, "visual": 0.3, "audio": 0.5, "description": 0.5},
+    "default":  {"text": 1.0, "visual": 1.0, "audio": 1.0, "description": 1.0},
 }
 
 
@@ -141,10 +141,18 @@ def search(
         filters=audio_filters,
     )
 
+    description_results = _vector_search_pipeline(
+        path="description_embedding",
+        query_vector=query_vector,
+        limit=limit,
+        num_candidates=num_candidates,
+        filters=filters or None,
+    )
+
     # Combine with weighted RRF
     fused = reciprocal_rank_fusion(
-        result_lists=[text_results, visual_results, audio_results],
-        weights=[w["text"], w["visual"], w["audio"]],
+        result_lists=[text_results, visual_results, audio_results, description_results],
+        weights=[w["text"], w["visual"], w["audio"], w.get("description", 1.0)],
     )
 
     return [SearchResult(**doc) for doc in fused[:limit]]

@@ -25,8 +25,15 @@ def create_vector_index(collection: Collection | None = None) -> None:
 
     existing = [idx["name"] for idx in collection.list_search_indexes()]
     if VECTOR_INDEX_NAME in existing:
-        print(f"Index '{VECTOR_INDEX_NAME}' already exists, skipping.")
-        return
+        print(f"Index '{VECTOR_INDEX_NAME}' already exists, dropping to recreate with new fields...")
+        collection.drop_search_index(VECTOR_INDEX_NAME)
+        # Wait for drop to complete
+        import time
+        for _ in range(30):
+            names = [idx["name"] for idx in collection.list_search_indexes()]
+            if VECTOR_INDEX_NAME not in names:
+                break
+            time.sleep(2)
 
     index_definition = {
         "fields": [
@@ -45,6 +52,12 @@ def create_vector_index(collection: Collection | None = None) -> None:
             {
                 "type": "vector",
                 "path": "audio_embedding",
+                "numDimensions": EMBEDDING_DIMS,
+                "similarity": "dotProduct",
+            },
+            {
+                "type": "vector",
+                "path": "description_embedding",
                 "numDimensions": EMBEDDING_DIMS,
                 "similarity": "dotProduct",
             },

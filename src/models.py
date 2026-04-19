@@ -21,6 +21,7 @@ class ContentDocument(BaseModel):
     comments: int = 0
     transcript: str = ""
     sound_name: str = ""
+    description: str = ""  # LLM-generated action description
     created_at: datetime | None = None
     ingested_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -28,12 +29,12 @@ class ContentDocument(BaseModel):
     text_embedding: list[float] | None = None
     visual_embedding: list[float] | None = None
     audio_embedding: list[float] | None = None
+    description_embedding: list[float] | None = None
 
     def to_mongo(self) -> dict:
         """Convert to a MongoDB document, excluding None embedding fields."""
         doc = self.model_dump()
-        # Remove None embeddings so MongoDB vector search skips these docs for that modality
-        for key in ("text_embedding", "visual_embedding", "audio_embedding"):
+        for key in ("text_embedding", "visual_embedding", "audio_embedding", "description_embedding"):
             if doc[key] is None:
                 del doc[key]
         return doc
